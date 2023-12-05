@@ -1,0 +1,122 @@
+#ifdef ESP32
+#include <WiFi.h>
+#else
+#include <ESP8266WiFi.h>
+#endif
+#include <WiFiClientSecure.h>
+#include <UniversalTelegramBot.h>
+#include <ArduinoJson.h>
+
+// Ganti dengan kredensial jaringan Anda
+const char *ssid = "Realme";
+const char *password = "87654321";
+
+// Inisialisasi BOT Telegram
+#define BOTtoken "6843800342:AAGmxRWEKrx_rQ2zGm_7B_4Dwr9Up1SXcd4" // Token BOT Anda (Dapatkan dari Botfather)
+#define CHAT_ID "1603920071"
+
+#ifdef ESP8266
+X509List cert(TELEGRAM_CERTIFICATE_ROOT);
+#endif
+
+WiFiClientSecure client;
+UniversalTelegramBot bot(BOTtoken, client);
+
+// Periksa pesan baru setiap 1 detik.
+int botRequestDelay = 1000;
+unsigned long lastTimeBotRan;
+
+bool pumpWaterStatus = false;
+
+void handleNewMessages(int numNewMessages)
+{
+  Serial.println("handleNewMessages");
+  Serial.println(String(numNewMessages));
+
+  for (int i = 0; i < numNewMessages; i++)
+  {
+    String chat_id = String(bot.messages[i].chat_id);
+    if (chat_id != CHAT_ID)
+    {
+      bot.sendMessage(chat_id, "Pengguna tidak diotorisasi", "");
+      continue;
+    }
+
+    String text = bot.messages[i].text;
+    Serial.println(text);
+
+    String from_name = bot.messages[i].from_name;
+
+    if (text == "/start")
+    {
+      String welcome = "Selamat datang, " + from_name + ".\n";
+      welcome += "Gunakan perintah berikut untuk mengendalikan perangkat Anda.\n\n";
+      welcome += "/ph_check - Periksa nilai pH\n";
+      welcome += "/start_pump_water - Hidupkan pompa air\n";
+      welcome += "/stop_pump_water - Matikan pompa air\n";
+      bot.sendMessage(chat_id, welcome, "");
+    }
+
+    if (text == "/ph_check")
+    {
+      // Implementasikan logika untuk memeriksa nilai pH di sini
+      float pHValue = 7.0; // Ganti dengan logika membaca pH aktual
+      String phMessage = "Nilai pH saat ini: " + String(pHValue, 2);
+      bot.sendMessage(chat_id, phMessage, "");
+    }
+
+    if (text == "/start_pump_water")
+    {
+      // Implementasikan logika untuk menyalakan pompa air di sini
+      pumpWaterStatus = true;
+      bot.sendMessage(chat_id, "Pompa air dihidupkan", "");
+    }
+
+    if (text == "/stop_pump_water")
+    {
+      // Implementasikan logika untuk mematikan pompa air di sini
+      pumpWaterStatus = false;
+      bot.sendMessage(chat_id, "Pompa air dimatikan", "");
+    }
+  }
+}
+
+void setup()
+{
+  Serial.begin(115200);
+
+#ifdef ESP8266
+  configTime(0, 0, "pool.ntp.org"); // dapatkan waktu UTC melalui NTP
+  client.setTrustAnchors(&cert);     // Tambahkan sertifikat root untuk api.telegram.org
+#endif
+
+  // Hubungkan ke Wi-Fi
+  WiFi.mode(WIFI_STA);
+  WiFi.begin(ssid, password);
+#ifdef ESP32
+  client.setCACert(TELEGRAM_CERTIFICATE_ROOT); // Tambahkan sertifikat root untuk api.telegram.org
+#endif
+  while (WiFi.status() != WL_CONNECTED)
+  {
+    delay(1000);
+    Serial.println("Menghubungkan ke WiFi..");
+  }
+  // Cetak Alamat IP Lokal ESP32
+  Serial.println(WiFi.localIP());
+}
+
+void loop()
+{
+  if (millis() > lastTimeBotRan + botRequestDelay)
+  {
+    int numNewMessages = bot.getUpdates(bot.last_message_received + 1);
+
+    while (numNewMessages)
+    {
+      Serial.println("Mendapatkan respons");
+      handleNewMessages(numNewMessages);
+      numNewMessages = bot.getUpdates(bot.last_message_received + 1);
+    }
+    lastTimeBotRan = millis();
+  }
+}
