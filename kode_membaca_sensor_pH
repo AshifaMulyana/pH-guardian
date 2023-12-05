@@ -1,0 +1,43 @@
+// Wiring:
+// Kabel putih -> GND
+// Kabel hitam -> Output to A0
+
+// Analog pin
+#define analogInPin A0 // Sambungkan kabel hitam (output) ke pin A0
+
+const int numReadings = 10;
+int readings[numReadings];
+int currentIndex = 0;
+float smoothingFactor = 0.2; // Mengurangi faktor pelembutan
+
+void setup()
+{
+  Serial.begin(9600);
+  pinMode(analogInPin, INPUT);
+  analogRead(analogInPin); // Baca sekali untuk membersihkan buffer
+}
+
+void loop()
+{
+  int sensorValue = analogRead(analogInPin);
+  readings[currentIndex] = (smoothingFactor * sensorValue) + ((1 - smoothingFactor) * readings[currentIndex]);
+  currentIndex = (currentIndex + 1) % numReadings;
+
+  int total = 0;
+  for (int i = 0; i < numReadings; i++)
+  {
+    total += readings[i];
+  }
+  int average = total / numReadings;
+
+  float outputValue = (-0.0693 * average) + 7.3855;
+
+  Serial.print("Sensor ADC= ");
+  Serial.print(sensorValue); // Tampilkan nilai bacaan langsung
+  Serial.print("  Smoothed ADC= ");
+  Serial.print(average);
+  Serial.print("  Output pH= ");
+  Serial.println(outputValue);
+
+  delay(1000);
+}
